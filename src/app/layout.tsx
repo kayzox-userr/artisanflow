@@ -1,7 +1,8 @@
 import "./globals.css";
 import SupabaseProvider from "../lib/supabaseProvider";
+import type { Metadata } from "next";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "ArtisansFlow",
   description: "Plateforme SaaS pour artisans et TPE",
 };
@@ -17,7 +18,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           fontFamily: "Inter, sans-serif",
         }}
       >
-        <SupabaseProvider>{children}</SupabaseProvider>
+        <SupabaseProvider>
+          {children}
+        </SupabaseProvider>
       </body>
     </html>
   );

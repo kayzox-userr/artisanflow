@@ -1,78 +1,178 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
-import { SupabaseClient, Session } from "@supabase/supabase-js";
-import { supabase } from "./supabaseClient"; // ✅ client préconfiguré
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import type { SupabaseClient, Session } from "@supabase/supabase-js";
+import { usePathname, useRouter } from "next/navigation";
+import { supabase as supabaseClient } from "./supabaseClient";
+import { determineHomeRoute, normalizeRole, type UserRole } from "./roles";
 
-// Création du contexte global Supabase
-const Context = createContext<{ supabase: SupabaseClient; session: Session | null }>({
-  supabase,
-  session: null,
-});
+type Profile = {
+  id: string;
+  full_name: string | null;
+  company: string | null;
+  logo_url: string | null;
+  role: UserRole;
+};
 
-export default function SupabaseProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+type SupabaseContextValue = {
+  supabase: SupabaseClient;
+  session: Session | null;
+  role: UserRole | null;
+  profile: Profile | null;
+  loading: boolean;
+  refreshProfile: () => Promise<void>;
+};
+
+const SupabaseContext = createContext<SupabaseContextValue | undefined>(undefined);
+
+export default function SupabaseProvider({ children }: { children: React.ReactNode }) {
+  const supabase = supabaseClient;
   const [session, setSession] = useState<Session | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [role, setRole] = useState<UserRole | null>(null);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const pathname = usePathname();
 
-  useEffect(() => {
-    try {
-      // Vérifie si Supabase est bien configuré
-      if (!supabase) {
-        throw new Error("⚠️ Supabase non initialisé !");
+  const hydrateProfile = useCallback(
+    async (activeSession: Session | null = session) => {
+      if (!activeSession?.user) {
+        setProfile(null);
+        setRole(null);
+        return;
       }
 
-      // Récupère la session utilisateur si elle existe
-      supabase.auth
-        .getSession()
-        .then(({ data }) => setSession(data.session))
-        .catch((err) => {
-          console.error("Erreur Supabase:", err);
-          setError("Impossible de récupérer la session Supabase.");
-        });
+      const userId = activeSession.user.id;
+      const metadataRole = normalizeRole(activeSession.user.user_metadata?.role as string | null);
 
-      // Écoute les changements de session (login / logout)
-      const { data: listener } = supabase.auth.onAuthStateChange((_event, session) =>
-        setSession(session)
-      );
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("id, full_name, company, logo_url, role")
+          .eq("id", userId)
+          .maybeSingle();
 
-      return () => {
-        listener.subscription.unsubscribe();
-      };
-    } catch (err: any) {
-      console.error("Erreur d'initialisation Supabase:", err.message);
-      setError("⚠️ Erreur de configuration Supabase.");
+        if (error) {
+          console.error("Erreur chargement profil Supabase", error);
+        }
+
+        let ensuredProfile = data ?? null;
+
+        if (!ensuredProfile) {
+          const insertResponse = await supabase
+            .from("profiles")
+            .insert({
+              id: userId,
+              full_name: activeSession.user.user_metadata?.full_name ?? null,
+              company: null,
+              logo_url: null,
+              role: metadataRole,
+            })
+            .select("id, full_name, company, logo_url, role")
+            .maybeSingle();
+
+          if (!insertResponse.error) {
+            ensuredProfile = insertResponse.data;
+          }
+        }
+
+        const nextRole = normalizeRole(ensuredProfile?.role ?? metadataRole);
+
+        setProfile(
+          ensuredProfile
+            ? {
+                id: ensuredProfile.id,
+                full_name: ensuredProfile.full_name ?? null,
+                company: ensuredProfile.company ?? null,
+                logo_url: ensuredProfile.logo_url ?? null,
+                role: nextRole,
+              }
+            : {
+                id: userId,
+                full_name: activeSession.user.user_metadata?.full_name ?? null,
+                company: null,
+                logo_url: null,
+                role: nextRole,
+              }
+        );
+        setRole(nextRole);
+
+        if (activeSession.user.user_metadata?.role !== nextRole) {
+          await supabase.auth
+            .updateUser({
+              data: { ...(activeSession.user.user_metadata ?? {}), role: nextRole },
+            })
+            .catch(() => undefined);
+        }
+      } catch (error) {
+        console.error("Erreur lors de la synchronisation du profil", error);
+      }
+    },
+    [session, supabase]
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (!isMounted) return;
+      setSession(data.session);
+      setLoading(false);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((event, newSession) => {
+      setSession(newSession);
+      if (event === "SIGNED_OUT") {
+        setProfile(null);
+        setRole(null);
+        router.push("/auth/sign-in");
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      listener.subscription.unsubscribe();
+    };
+  }, [supabase, router]);
+
+  useEffect(() => {
+    if (!session?.user) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setProfile(null);
+      setRole(null);
+      return;
     }
-  }, []);
+    hydrateProfile(session);
+  }, [session, hydrateProfile]);
 
-  // 💡 Si erreur → afficher une jolie alerte
-  if (error) {
-    return (
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          height: "100vh",
-          backgroundColor: "#fff4f4",
-          color: "#b91c1c",
-          fontFamily: "Inter, sans-serif",
-          flexDirection: "column",
-        }}
-      >
-        <h2 style={{ fontSize: "1.5rem", marginBottom: "0.5rem" }}>🚨 Erreur Supabase</h2>
-        <p>{error}</p>
-        <p style={{ marginTop: "1rem", fontSize: "0.9rem", color: "#7f1d1d" }}>
-          Vérifie ton fichier <code>.env.local</code> et redémarre le serveur.
-        </p>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (!session || !role) return;
+    if (pathname?.startsWith("/auth")) {
+      router.replace(determineHomeRoute(role));
+    }
+  }, [session, role, pathname, router]);
 
-  return <Context.Provider value={{ supabase, session }}>{children}</Context.Provider>;
+  const refreshProfile = useCallback(async () => {
+    await hydrateProfile(session);
+  }, [hydrateProfile, session]);
+
+  const value = useMemo(
+    () => ({
+      supabase,
+      session,
+      role,
+      profile,
+      loading,
+      refreshProfile,
+    }),
+    [supabase, session, role, profile, loading, refreshProfile]
+  );
+
+  return <SupabaseContext.Provider value={value}>{children}</SupabaseContext.Provider>;
 }
 
-export const useSupabase = () => useContext(Context);
+export const useSupabase = () => {
+  const ctx = useContext(SupabaseContext);
+  if (!ctx) throw new Error("useSupabase must be used within SupabaseProvider");
+  return ctx;
+};
