@@ -29,16 +29,12 @@ import {
 /* ===========================
    ANIMATIONS UTILITAIRES
 =========================== */
-const fadeUp = (customDelay?: number): MotionProps => {
-  const d = customDelay ?? 0.2;
-
-  return {
-    initial: { opacity: 0, y: 40 },
-    whileInView: { opacity: 1, y: 0 },
-    transition: { duration: 0.8, delay: d },
-    viewport: { once: true, amount: 0.2 },
-  };
-};
+const fadeUp = (delay = 0.2): MotionProps => ({
+  initial: { opacity: 0, y: 40 },
+  whileInView: { opacity: 1, y: 0 },
+  transition: { duration: 0.8, delay },
+  viewport: { once: true, amount: 0.2 },
+});
 
 /* ===========================
    COMPOSANT TILT (3D hover)
