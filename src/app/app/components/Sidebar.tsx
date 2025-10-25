@@ -1,0 +1,42 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+export default function Sidebar() {
+  const pathname = usePathname();
+
+  const links = [
+    { href: "/app", label: "Dashboard" },
+    { href: "/app/clients", label: "Clients" },
+    { href: "/app/quotes", label: "Devis" },
+    { href: "/app/invoices", label: "Factures" },
+    { href: "/app/settings", label: "Paramètres" },
+  ];
+
+  return (
+    <aside className="w-64 h-screen bg-gray-900 text-gray-100 flex flex-col shadow-lg">
+      <div className="px-6 py-4 border-b border-gray-700 text-2xl font-bold">
+        ArtisansFlow
+      </div>
+      <nav className="flex-1 px-4 py-6 space-y-2">
+        {links.map((link) => (
+          <Link
+            key={link.href}
+            href={link.href}
+            className={`block px-4 py-2 rounded-md text-sm font-medium transition ${
+              pathname === link.href
+                ? "bg-blue-600 text-white"
+                : "hover:bg-gray-800 text-gray-300"
+            }`}
+          >
+            {link.label}
+          </Link>
+        ))}
+      </nav>
+      <div className="p-4 border-t border-gray-700 text-xs text-gray-400">
+        © {new Date().getFullYear()} ArtisansFlow
+      </div>
+    </aside>
+  );
+}
