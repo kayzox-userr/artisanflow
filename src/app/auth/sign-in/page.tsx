@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState, type FormEvent } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSupabase } from "@/lib/supabaseProvider";
 import { determineHomeRoute, normalizeRole } from "@/lib/roles";
 
-export default function SignInPage() {
+function SignInForm() {
   const { supabase } = useSupabase();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -17,7 +17,7 @@ export default function SignInPage() {
   const [error, setError] = useState<string | null>(null);
   const redirectParam = searchParams?.get("redirectTo");
 
-  async function handleSignIn(event: React.FormEvent) {
+  async function handleSignIn(event: FormEvent) {
     event.preventDefault();
     setLoading(true);
     setError(null);
@@ -41,10 +41,12 @@ export default function SignInPage() {
 
     const resolvedRole = normalizeRole(profileResponse.data?.role ?? (data.user.user_metadata?.role as string | null));
 
-    await supabase
+    const { error: activityError } = await supabase
       .from("user_activity")
-      .insert({ user_id: data.user.id, logged_at: new Date().toISOString() })
-      .catch(() => undefined);
+      .insert({ user_id: data.user.id, logged_at: new Date().toISOString() });
+    if (activityError) {
+      console.error("Failed to log user activity", activityError);
+    }
 
     router.push(redirectParam || determineHomeRoute(resolvedRole));
     setLoading(false);
@@ -55,15 +57,15 @@ export default function SignInPage() {
       <div className="hidden lg:flex flex-1 flex-col justify-between p-16 bg-gradient-to-br from-gray-900 to-gray-800">
         <div>
           <p className="text-sm uppercase tracking-[0.3em] text-gray-400">ArtisansFlow</p>
-          <h1 className="text-4xl font-bold mt-6">Reprends le contrôle de ton activité.</h1>
+          <h1 className="text-4xl font-bold mt-6">Reprends le contr��le de ton activitǸ.</h1>
           <p className="mt-4 text-gray-300 max-w-md">
-            Connecte-toi pour retrouver tes tableaux de bord, ton CRM et tes automatisations en temps réel.
+            Connecte-toi pour retrouver tes tableaux de bord, ton CRM et tes automatisations en temps rǸel.
           </p>
         </div>
         <div className="space-y-3 text-sm text-gray-400">
-          <p>✔️ Authentification sécurisée Supabase</p>
-          <p>✔️ Statistiques et revenus en live</p>
-          <p>✔️ Exports premium & automation</p>
+          <p>{'�o"��? Authentification sǸcurisǸe Supabase'}</p>
+          <p>{'�o"��? Statistiques et revenus en live'}</p>
+          <p>{'�o"��? Exports premium & automation'}</p>
         </div>
       </div>
 
@@ -75,9 +77,9 @@ export default function SignInPage() {
       >
         <form onSubmit={handleSignIn} className="w-full max-w-md p-10">
           <p className="text-sm text-blue-600 font-semibold">Heureux de te revoir 👋</p>
-          <h2 className="text-3xl font-bold mt-2">Connexion à ArtisansFlow</h2>
+          <h2 className="text-3xl font-bold mt-2">Connexion �� ArtisansFlow</h2>
           <p className="text-sm text-gray-500 mt-2">
-            Pas encore membre ? <Link href="/auth/sign-up" className="text-blue-600 hover:underline">Crée ton compte</Link>
+            Pas encore membre ? <Link href="/auth/sign-up" className="text-blue-600 hover:underline">CrǸe ton compte</Link>
           </p>
 
           <div className="mt-8 space-y-4">
@@ -100,7 +102,7 @@ export default function SignInPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="mt-2 w-full rounded-lg border border-gray-200 px-4 py-3 focus:border-blue-500 focus:outline-none"
-                placeholder="••••••••"
+                placeholder="�?��?��?��?��?��?��?��?�"
               />
             </div>
           </div>
@@ -117,7 +119,7 @@ export default function SignInPage() {
 
           <div className="mt-6 text-center text-sm text-gray-500">
             <Link href="/" className="text-blue-600 hover:underline">
-              ← Retourner sur la vitrine
+              ��? Retourner sur la vitrine
             </Link>
           </div>
         </form>
@@ -126,3 +128,10 @@ export default function SignInPage() {
   );
 }
 
+export default function SignInPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignInForm />
+    </Suspense>
+  );
+}

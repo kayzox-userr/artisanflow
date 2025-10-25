@@ -106,7 +106,7 @@ export default function AdminPage() {
     });
 
     const connectionsSeries = buildConnectionsSeries();
-    const byDay = new Map(connectionsSeries.map((point) => [point.label, 0] as const));
+    const byDay = new Map<string, number>(connectionsSeries.map((point) => [point.label, 0]));
 
     (activityResponse.data ?? []).forEach((row) => {
       const loggedAt = row.logged_at ? new Date(row.logged_at) : null;

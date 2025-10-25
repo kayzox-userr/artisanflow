@@ -34,7 +34,7 @@ export const ROLE_ACCESS: Record<UserRole, FeatureKey[]> = {
   PRO: ["dashboard", "clients", "stats"],
   ULTIMATE: ["dashboard", "clients", "stats", "settings"],
   VIP: ["dashboard", "clients", "stats", "settings"],
-  ADMIN: FEATURE_KEYS,
+  ADMIN: [...FEATURE_KEYS],
 };
 
 export const ROLE_HOME_ROUTE: Record<UserRole, string> = {

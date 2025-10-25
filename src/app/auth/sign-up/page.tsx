@@ -44,15 +44,15 @@ export default function SignUpPage() {
       return;
     }
 
-    await supabase
-      .from("profiles")
-      .upsert({
-        id: data.user.id,
-        full_name: fullName || null,
-        company: company || null,
-        role: plan,
-      })
-      .catch(() => undefined);
+    const { error: profileError } = await supabase.from("profiles").upsert({
+      id: data.user.id,
+      full_name: fullName || null,
+      company: company || null,
+      role: plan,
+    });
+    if (profileError) {
+      console.error("Failed to upsert profile", profileError);
+    }
 
     router.push("/auth/sign-in?registered=1");
     setLoading(false);
